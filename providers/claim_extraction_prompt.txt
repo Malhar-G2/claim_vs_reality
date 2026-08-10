@@ -1,0 +1,64 @@
+You are extracting marketing claims from a vendor's website content, for
+later verification against real customer reviews on G2.
+
+A marketing claim is a specific, checkable statement the vendor makes about
+itself or its product. Do not include vague slogans or adjectives with no
+checkable content.
+
+REVIEWABILITY -- this is the most important filter. Before including a
+claim, ask: "could a G2 reviewer plausibly confirm or refute this from their
+own experience using the product?"
+
+Keep claims about user-facing experience and outcomes: support quality,
+ease of use, performance, results or ROI a customer achieved, specific
+feature behavior.
+
+Outcome statistics such as "customers acquire 129%% more leads" or "close 36%% more deals" ARE reviewable even though a reviewer can't independently
+verify the exact percentage -- a reviewer CAN confirm the direction of the effect (did leads/deals/resolution time improve after adopting the product?). Keep these.
+
+Drop claims that are abstract business-scale or customer-base statistics,
+even when the number is impressive, because no individual reviewer's
+experience can confirm or refute them: total customer counts ("299,000+
+customers in over 135 countries"), community size ("1.4M+ community
+members"), or market-share style statistics ("62%% of Fortune 100 use
+[product]"). These describe the vendor's overall business, not something any
+single reviewer experiences -- skip them even if they sound like strong
+marketing claims.
+
+FEATURE-DESCRIPTION SENTENCES ("Build marketing campaigns from one
+AI-powered workspace that unifies planning, creation, and execution.") are
+only reviewable, and should only be kept, if they name a SPECIFIC, CONCRETE
+mechanism or capability that a user could point to and say "yes, this
+actually works well" or "no, it doesn't." Drop feature-description
+sentences that only use generic/soft language with no specific mechanism
+named -- these read as taglines, not checkable claims, even though they are
+phrased as feature descriptions. For example, drop: "put tedious tasks on
+autopilot while your team focuses on strategy" (no concrete mechanism
+named), "transform scattered conversations into meaningful relationships
+with a unified inbox" (too generic about what the inbox actually does), and
+"manage website personalization with unified tools that scale tailored
+content" (same generic "unified tools" pattern, no specific mechanism).
+
+VERBATIM TEXT -- claim_text must be the exact, complete, intact sentence as
+it appears on the page. Do not paraphrase, summarize, shorten, or combine
+multiple sentences. Do not extract a fragment or sub-part of a sentence. Copy
+the full sentence exactly as written, including its original punctuation.
+
+IMPACT SCORE -- for every claim that passes the filters above, assign an
+impact_score from 1 to 10 estimating how much this claim would influence a
+prospective buyer's purchase decision. Score higher: claims with concrete,
+differentiating detail (specific proven outcomes, named mechanisms with real
+behavioral detail, third-party rankings) that a buyer comparing options
+would find persuasive. Score lower: claims that are true and reviewable but
+generic, minor, or easily true of most competing products too. A claim
+having a number in it does not automatically mean a high score -- score on
+how differentiating and decision-relevant the claim is, not on whether it
+is quantified.
+
+The input contains multiple pages, each starting with a line in the form
+"### Page: <url>". For every claim you extract, set source_url to the exact
+url from the "### Page:" marker of the page it came from.
+
+Return every claim you find across all pages that passes the reviewability
+filter above, each with its impact_score. Do not limit how many claims you
+return -- scoring and selecting the final set happens after your response.
