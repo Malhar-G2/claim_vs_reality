@@ -1,0 +1,128 @@
+You are extracting marketing claims from a vendor's website content, for
+later verification against real customer reviews on G2.
+
+A marketing claim is a specific, checkable statement the vendor makes about
+itself or its product. Do not include vague slogans or adjectives with no
+checkable content.
+
+Process every candidate sentence through the steps below, IN ORDER. A
+sentence must pass every step to be kept.
+
+STEP 1 -- VENDOR VOICE ONLY (NO TESTIMONIALS)
+Keep ONLY statements made in the VENDOR's OWN VOICE about itself or its
+product. Drop any sentence that is a customer's, reviewer's, or third
+party's own words, even when the vendor chose to publish it on their site
+and even when it is a compelling, specific, number-filled statement. This
+includes: quoted customer testimonials (sentences appearing as a
+blockquote, attributed to a named person/company, or written in the first
+person from a customer's perspective, e.g. "Between two emails we did over
+$76,000 in revenue, and it was largely thanks to [Product]"), and any
+pull-quote or review excerpt. The distinguishing test is WHO is speaking:
+"[Product] customers acquire 129%% more leads" is the vendor making a claim
+about its own product in its own voice -- KEEP. "We did over $76,000 in
+revenue thanks to [Product]" is a customer speaking in their own voice,
+merely hosted on the vendor's page -- DROP, no matter how impressive the
+number.
+
+STEP 2 -- REVIEWABILITY (CORE FILTER)
+Ask: "could a G2 reviewer plausibly confirm or refute this from their own
+experience using the product?"
+
+Keep claims about user-facing experience and outcomes: support quality,
+ease of use, performance, results or ROI a customer achieved, specific
+feature behavior.
+
+Outcome statistics such as "customers acquire 129%% more leads" or "close
+36%% more deals" ARE reviewable even though a reviewer can't independently
+verify the exact percentage -- a reviewer CAN confirm the direction of the
+effect (did leads/deals/resolution time improve after adopting the
+product?). Keep these.
+
+Drop claims that are abstract business-scale or customer-base statistics,
+even when the number is impressive, because no individual reviewer's
+experience can confirm or refute them: total customer counts ("299,000+
+customers in over 135 countries"), community size ("1.4M+ community
+members"), or market-share style statistics ("62%% of Fortune 100 use
+[product]"). These describe the vendor's overall business, not something any
+single reviewer experiences -- skip them even if they sound like strong
+marketing claims.
+
+STEP 3 -- CONCRETE MECHANISM FOR FEATURE-DESCRIPTION SENTENCES
+Feature-description sentences ("Build marketing campaigns from one
+AI-powered workspace that unifies planning, creation, and execution.") are
+only reviewable, and should only be kept, if they name a SPECIFIC, CONCRETE
+mechanism or capability that a user could point to and say "yes, this
+actually works well" or "no, it doesn't."
+
+Apply this test: could a user verify this specific claim within the first
+5 minutes of using the product, without needing a demo or sales call? If
+the sentence is really just describing the overall product vision, mission,
+or platform positioning rather than one specific testable behavior, DROP
+it even if it sounds detailed or uses concrete-sounding words like
+"real-time" or "automate."
+
+DROPPED EXAMPLES (real negative cases -- do not extract sentences like
+these):
+- "put tedious tasks on autopilot while your team focuses on strategy" (no
+  concrete mechanism named)
+- "transform scattered conversations into meaningful relationships with a
+  unified inbox" (too generic about what the inbox actually does)
+- "manage website personalization with unified tools that scale tailored
+  content" (same generic "unified tools" pattern, no specific mechanism)
+- "Automate planning, improve hybrid coordination, and get real-time
+  intelligence across your portfolio, all from one connected platform."
+  (reads as detailed but is a mission-statement / platform-positioning
+  sentence, not one specific testable behavior -- fails the 5-minute test)
+
+KEPT EXAMPLE:
+- "Drive marketing engagement with an AI agent that captures visitor
+  interest, answers questions 24/7, and books meetings automatically."
+  (names concrete mechanisms a user could test)
+
+STEP 4 -- EXACT TEXT
+claim_text should be the exact, complete, intact sentence as it appears on
+the page you found it on. Do not paraphrase, summarize, shorten, or combine
+multiple sentences. Do not extract a fragment or sub-part of a sentence.
+Copy the full sentence exactly as written, including its original
+punctuation.
+
+STEP 5 -- IMPACT SCORE
+For every claim that passed Steps 1-4, assign an impact_score from 1 to 10
+estimating how much this claim would influence a prospective buyer's
+purchase decision. Score higher: claims with concrete, differentiating
+detail (specific proven outcomes, named mechanisms with real behavioral
+detail, third-party rankings) that a buyer comparing options would find
+persuasive. Score lower: claims that are true and reviewable but generic,
+minor, or easily true of most competing products too. A claim having a
+number in it does not automatically mean a high score -- score on how
+differentiating and decision-relevant the claim is, not on whether it is
+quantified.
+
+STEP 6 -- DISTINCTNESS (dedupe against your own other candidates)
+Two claims that describe the same underlying capability, certification, or
+outcome in different words count as ONE claim, not two -- keep only the
+stronger/more specific phrasing and drop the other, even if both
+individually passed Steps 1-5.
+
+Example of a duplicate pair to collapse into one: "meets HIPAA and FedRAMP
+High requirements" and "helps organizations with stringent regulatory
+compliance including HIPAA, FedRAMP High" describe the same compliance
+claim in different words -- keep only the stronger/more specific one.
+
+STEP 7 -- FINAL SELECTION
+Before producing your final answer, think through Steps 1-6 explicitly for
+your candidate sentences: note which you are keeping or dropping and why,
+and which duplicate pairs you collapsed in Step 6. Only after that
+reasoning pass, select your final list.
+
+Return AT MOST 10 claims total: the 10 highest impact_score claims
+remaining after Step 6's deduplication. If fewer than 10 claims pass all
+prior steps, return only those that do -- do not pad the list with weaker
+claims just to reach 10.
+
+For every claim you extract, set source_url to the exact page URL you found
+it on.
+
+Crawl this vendor's website (starting from the given URL, following
+same-domain links) and apply Steps 1-7 above to produce your final list of
+at most 10 claims, each with its impact_score and source_url.

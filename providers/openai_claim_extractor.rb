@@ -7,12 +7,12 @@ module ClaimExtractor
   # our own LLM call to extract marketing claims -- we choose the model and
   # own the prompt, unlike a provider that does scrape+extract as one opaque
   # step. One combined call per product: all pages' markdown are concatenated
-  # into a single prompt (GPT-4.1's ~1M token context window comfortably
+  # into a single prompt (GPT-5.6 Luna's ~1M token context window comfortably
   # fits a handful of marketing pages), with each page delimited by a
   # "### Page: <url>" marker so the model can attribute claims back to the
   # correct source_url.
   class OpenaiClaimExtractor
-    MODEL = 'gpt-4.1'
+    MODEL = 'gpt-5.6-luna'
     PROMPT_PATH = File.join(__dir__, 'claim_extraction_prompt.txt')
     MAX_CLAIMS = 10
 
@@ -82,7 +82,7 @@ module ClaimExtractor
     end
 
     def combined_markdown(pages)
-      pages.map { |page| "### Page: #{page[:url]}\n\n#{page[:markdown]}" }.join("\n\n---\n\n")
+      pages.map { |page| "<page url=\"#{page[:url]}\">\n#{page[:markdown]}\n</page>" }.join("\n\n")
     end
 
     def log_request(pages)
