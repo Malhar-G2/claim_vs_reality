@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+
+require_relative "../config/environment"
+require "products/product_ingestion"
+
+input_path = ARGV.fetch(0)
+count = Products::ProductIngestion.new.ingest_file(input_path)
+
+puts "Ingested #{count} unique products"

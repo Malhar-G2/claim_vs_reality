@@ -186,10 +186,18 @@ module ClaimExtractor
         attempts += 1
         raise if attempts > RATE_LIMIT_RETRIES
 
-        puts "  rate limited, waiting #{RATE_LIMIT_BACKOFF_SECONDS}s before retry #{attempts}/#{RATE_LIMIT_RETRIES} (#{e.message})"
-        sleep RATE_LIMIT_BACKOFF_SECONDS
+        backoff_seconds = rate_limit_backoff_seconds(e.message)
+        puts "  rate limited, waiting #{backoff_seconds}s before retry #{attempts}/#{RATE_LIMIT_RETRIES} (#{e.message})"
+        sleep backoff_seconds
         retry
       end
+    end
+
+    def rate_limit_backoff_seconds(error_message)
+      match = error_message.to_s.match(/retry after (\d+)s/i)
+      return RATE_LIMIT_BACKOFF_SECONDS unless match
+
+      match[1].to_i
     end
 
     # Matches ONLY the exact path of the given homepage URL (e.g. "^/en/?$"
@@ -242,8 +250,6 @@ module ClaimExtractor
     def build_page(doc)
       markdown = doc.markdown.to_s
       return nil if markdown.strip.empty?
-      puts "- - - - - URL: #{doc.metadata&.fetch('sourceURL', nil) || doc.metadata&.fetch('url', nil)} - - - -\n\n"
-      puts "- - - - Markdown: #{markdown} - - - - \n\n"
       url = doc.metadata&.fetch('sourceURL', nil) || doc.metadata&.fetch('url', nil)
       { url: url, markdown: markdown }
     end

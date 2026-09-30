@@ -1,0 +1,10 @@
+#!/usr/bin/env ruby
+
+require_relative "../config/environment"
+require "export/claims_csv_exporter"
+
+exporter = Export::ClaimsCsvExporter.new
+path = ARGV[0] || exporter.default_path
+count = exporter.export(path: path)
+
+puts "Exported #{count} claims to #{path}"

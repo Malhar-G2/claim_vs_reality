@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+
+require_relative "../config/environment"
+require "openai_batch/batch_submission_service"
+
+limit = Integer(ENV.fetch("OPENAI_BATCH_REQUEST_SIZE", "500"))
+count = OpenaiBatch::BatchSubmissionService.new.submit(limit: limit)
+
+puts "Submitted #{count} product requests"

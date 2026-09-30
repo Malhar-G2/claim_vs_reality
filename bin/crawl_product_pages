@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+
+require_relative "../config/environment"
+require "crawling/marketing_page_crawler"
+
+limit = Integer(ENV.fetch("CRAWL_BATCH_SIZE", "100"))
+count = Crawling::MarketingPageCrawler.new.crawl_pending(limit: limit)
+
+puts "Crawled #{count} products"
