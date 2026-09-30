@@ -37,14 +37,11 @@ module ClaimExtractor
   # and raise the odds any given real product page is included.
   class FirecrawlPageFetcher
     MAX_PAGES = 30
-    # Firecrawl checks the starting URL itself against includePaths -- if it
-    # doesn't match, the crawl returns 0 pages. "^/?$" (empty path or bare
-    # "/") keeps the homepage crawlable even though it doesn't match any
-    # keyword. NOTE: a bare, unanchored "$" matches EVERY string in Ruby
-    # regex (it just means "end of string") -- it is NOT "matches empty
-    # string only". An earlier version of this file used bare "$" here,
-    # which silently made the entire include-path filter a no-op (every
-    # candidate path "matched"). Always anchor with "^" too.
+    # NOTE: a bare, unanchored "$" matches EVERY string in Ruby regex (it
+    # just means "end of string") -- it is NOT "matches empty string only".
+    # An earlier version of this file used bare "$" here, which silently
+    # made the entire include-path filter a no-op (every candidate path
+    # "matched"). Always anchor with "^" too.
     #
     # Paths are anchored ("^/pricing/?$" style, one segment deep) rather than
     # loose wildcards, so a parent marketing page isn't out-competed by its
@@ -75,23 +72,41 @@ module ClaimExtractor
     # both /platform/marketing-automation (activecampaign.com) and
     # /email-marketing were being missed by earlier, narrower versions of
     # this pattern.
-    INCLUDE_PATHS = %w[^/?$
-                      /[\w-]*marketing[\w-]*/?$
+    #
+    # No static homepage pattern (e.g. "^/?$") lives in this list -- Firecrawl
+    # checks the STARTING URL of a crawl against includePaths, and if it
+    # doesn't match, the ENTIRE crawl returns 0 pages, not just "skip the
+    # homepage." A static "^/?$" only covers a homepage living at a bare "/",
+    # silently breaking any vendor whose homepage path is something else
+    # (e.g. "/en", "/home"). #crawl_options instead computes the actual path
+    # of the given homepage_url at request time and adds an exact-match
+    # pattern for it, so the starting URL always matches regardless of path.
+    INCLUDE_PATHS = %w[/[\w-]*marketing[\w-]*/?$
                       /[\w-]*sales[\w-]*/?$
                       ^/pricing/?$
                       ^/features/?$
                       ^/solutions?(?:/|$)
-                      ^/products?/?$
+                      ^/products?(?:/[^/]+)?/?$
                       ^/platform/?$
-                      ^/(?:roi|results|impact)(?:/|$)
-                      ^/testimonials?(?:/|$)].freeze
+                      ^/(?:roi|results|impact)(?:/|$)].freeze
 
     # Full ISO 639-1 two-letter language code list, used to recognize a
     # locale-prefixed path segment (e.g. /fi/..., /sv/..., /pt-BR/...)
     # regardless of what comes after it or how deep the path goes.
+    #
+    # "en" is deliberately excluded from this list: a batched real-vendor run
+    # showed 6 URLs (sage.com x5, navis.com) whose ENTIRE site lives under
+    # /en/ or /en-us/ as their one and only path structure, not a genuine
+    # locale-duplicate of some other-language version -- our own exclude
+    # regex was silently zeroing out their crawls (confirmed by testing
+    # EXCLUDE_PATHS against these URLs directly, see conversation history
+    # 2026-08-13). Since vendor pages are already overwhelmingly English by
+    # default, dropping "en" trades away de-duping genuine /en/-vs-/fr/-style
+    # locale-switcher duplicates (rare in this INCLUDE_PATHS-narrowed page
+    # set) for not losing whole vendors outright.
     ISO_639_1_CODES = %w(
       ab aa af ak sq am ar an hy as av ae ay az bm ba eu be bn bh bi bs br bg
-      my ca ch ce ny zh cv kw co cr hr cs da dv nl dz en eo et ee fo fj fi fr
+      my ca ch ce ny zh cv kw co cr hr cs da dv nl dz eo et ee fo fj fi fr
       ff gl ka de el gn gu ht ha he hz hi ho hu ia id ie ga ig ik io is it iu
       ja jv kl kn kr ks kk km ki rw kv kg ko ku kj la lb lg li ln lo lt lu lv
       gv mk mg ms ml mt mi mr mh mn na nv nb nd ne ng nn no ii nr oc oj cu om
@@ -120,9 +135,34 @@ module ClaimExtractor
     RATE_LIMIT_BACKOFF_SECONDS = 30
 
     # Returns [{ url:, markdown: }, ...] -- one entry per successfully scraped page.
+    #
+    # Tries a narrow crawl first (crawlEntireDomain: false -- scoped to pages
+    # below/within the starting URL's own path, per Firecrawl's default
+    # crawl-scope rule). Root-caused via #get_crawl_errors on 10 real vendor
+    # URLs (2026-08-13/14): several vendors 301/302-redirect their starting
+    # URL to a path OUTSIDE that hierarchy (e.g. /pricing/ -> /platform/), and
+    # Firecrawl's default scope rule then refuses to scrape even that
+    # redirected page, returning a job that completes cleanly with 0 pages
+    # (no exception). Only THEN retry once with crawlEntireDomain: true,
+    # which lets Firecrawl follow the redirect and discover pages anywhere on
+    # the domain (INCLUDE_PATHS/EXCLUDE_PATHS still filter what comes back).
+    #
+    # The retry is gated on "narrow crawl returned 0 pages" specifically, not
+    # on "narrow crawl failed" -- a crawl that times out or hits a
+    # non-recoverable rate limit raises Firecrawl::FirecrawlError, which
+    # propagates straight to the rescue below and is never seen as merely
+    # "empty", so those cases correctly skip the wider retry instead of
+    # doubling an already-exhausted wait.
     def fetch_pages(homepage_url)
-      job = crawl_with_rate_limit_retry(homepage_url)
-      pages = Array(job.data).filter_map { |doc| build_page(doc) }
+      job = crawl_with_rate_limit_retry(homepage_url, crawl_entire_domain: false)
+      pages = extract_pages(job)
+
+      if pages.empty?
+        puts '  no pages found with narrow crawl, retrying with crawlEntireDomain...'
+        job = crawl_with_rate_limit_retry(homepage_url, crawl_entire_domain: true)
+        pages = extract_pages(job)
+      end
+
       log_discovered_urls(pages)
       pages
     rescue Firecrawl::FirecrawlError => e
@@ -131,27 +171,60 @@ module ClaimExtractor
 
     private
 
-    def crawl_with_rate_limit_retry(homepage_url)
+    def extract_pages(job)
+      Array(job.data).filter_map { |doc| build_page(doc) }
+    end
+
+    def crawl_with_rate_limit_retry(homepage_url, crawl_entire_domain:)
       attempts = 0
 
       begin
-        Spinner.run("  crawling #{homepage_url}...") { @client.crawl(homepage_url, crawl_options) }
+        Spinner.run("  crawling #{homepage_url}...") do
+          @client.crawl(homepage_url, crawl_options(homepage_url, crawl_entire_domain: crawl_entire_domain))
+        end
       rescue Firecrawl::RateLimitError => e
         attempts += 1
         raise if attempts > RATE_LIMIT_RETRIES
 
-        puts "  rate limited, waiting #{RATE_LIMIT_BACKOFF_SECONDS}s before retry #{attempts}/#{RATE_LIMIT_RETRIES} (#{e.message})"
-        sleep RATE_LIMIT_BACKOFF_SECONDS
+        backoff_seconds = rate_limit_backoff_seconds(e.message)
+        puts "  rate limited, waiting #{backoff_seconds}s before retry #{attempts}/#{RATE_LIMIT_RETRIES} (#{e.message})"
+        sleep backoff_seconds
         retry
       end
     end
 
-    def crawl_options
+    def rate_limit_backoff_seconds(error_message)
+      match = error_message.to_s.match(/retry after (\d+)s/i)
+      return RATE_LIMIT_BACKOFF_SECONDS unless match
+
+      match[1].to_i
+    end
+
+    # Matches ONLY the exact path of the given homepage URL (e.g. "^/en/?$"
+    # for "https://vendor.com/en"), so whatever path a vendor's homepage
+    # actually lives at always satisfies Firecrawl's starting-URL check,
+    # regardless of INCLUDE_PATHS' keyword patterns.
+    def homepage_path_pattern(homepage_url)
+      path = URI(homepage_url).path.to_s.chomp('/')
+      "^#{Regexp.escape(path)}/?$"
+    rescue URI::InvalidURIError
+      '^/?$'
+    end
+
+    # crawl_entire_domain: false (the default/first attempt) keeps Firecrawl's
+    # normal scope rule -- only pages below/within the starting URL's own
+    # path. true is the fallback fetch_pages retries with when that first
+    # attempt finds 0 pages (see fetch_pages for why): it widens discovery to
+    # the whole domain so a starting URL that redirects outside its own path
+    # hierarchy can still be reached, while INCLUDE_PATHS/EXCLUDE_PATHS keep
+    # filtering which of those domain-wide pages actually come back.
+    def crawl_options(homepage_url, crawl_entire_domain:)
       Firecrawl::Models::CrawlOptions.new(
         sitemap: 'skip',
-        include_paths: INCLUDE_PATHS,
+        include_paths: INCLUDE_PATHS + [homepage_path_pattern(homepage_url)],
         exclude_paths: EXCLUDE_PATHS,
         limit: MAX_PAGES,
+        crawl_entire_domain: crawl_entire_domain,
         # ignoreQueryParameters strips ALL query params before the
         # already-visited check -- it cannot distinguish a tracking param
         # (safe to merge) from a param that serves genuinely different
@@ -177,8 +250,6 @@ module ClaimExtractor
     def build_page(doc)
       markdown = doc.markdown.to_s
       return nil if markdown.strip.empty?
-      puts "- - - - - URL: #{doc.metadata&.fetch('sourceURL', nil) || doc.metadata&.fetch('url', nil)} - - - -\n\n"
-      puts "- - - - Markdown: #{markdown} - - - - \n\n"
       url = doc.metadata&.fetch('sourceURL', nil) || doc.metadata&.fetch('url', nil)
       { url: url, markdown: markdown }
     end

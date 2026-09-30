@@ -1,0 +1,8 @@
+#!/usr/bin/env ruby
+
+require_relative "../config/environment"
+require "claims/claim_parsing_service"
+
+count = Claims::ClaimParsingService.new.parse_pending(limit: Integer(ENV.fetch("OPENAI_BATCH_REQUEST_SIZE", "500")))
+
+puts "Parsed claims for #{count} products"

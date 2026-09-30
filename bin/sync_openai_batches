@@ -1,0 +1,8 @@
+#!/usr/bin/env ruby
+
+require_relative "../config/environment"
+require "openai_batch/batch_sync_service"
+
+count = OpenaiBatch::BatchSyncService.new.sync!
+
+puts "Synced #{count} batch jobs"
